@@ -1,0 +1,64 @@
+<!DOCTYPE html>
+<html lang="en"><head><meta charset="utf-8"><meta name="viewport" content="width=device-width, initial-scale=1">
+<title>AquaSense</title>
+<style>
+:root{--bg:#f3f6fa;--surf:#fff;--ink:#14213d;--mute:#5b6781;--line:#dbe2ec;--acc:#c8102e;--ok:#1f8a4c;--warn:#d98a00;--bad:#c8102e;--track:#e6ebf2}
+:root[data-theme=dark]{--bg:#0c1423;--surf:#142036;--ink:#e8eef9;--mute:#97a4bd;--line:#26354f;--acc:#ff4d67;--ok:#43c47a;--warn:#f0ad2e;--bad:#ff5c73;--track:#243450;color-scheme:dark}
+*{box-sizing:border-box}body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,sans-serif}
+header{display:flex;gap:12px;align-items:center;padding:10px 20px;background:var(--surf);border-bottom:1px solid var(--line);flex-wrap:wrap}
+.logo{font-weight:800;font-size:20px;flex:1}.logo i{color:var(--acc);font-style:normal}
+nav{display:flex;gap:4px;padding:0 20px;background:var(--surf);border-bottom:1px solid var(--line);overflow-x:auto}nav button{border:0;background:none;color:var(--mute);font-weight:600;border-radius:0;padding:10px 12px;white-space:nowrap}nav button.on{color:var(--ink);box-shadow:inset 0 -3px var(--acc)}.sl{display:grid;grid-template-columns:110px 1fr 80px;gap:8px;align-items:center;margin:6px 0}input[type=range]{padding:0}.pill{padding:2px 10px;border-radius:99px;font-size:12px;font-weight:700;color:#fff;background:var(--warn)}@media print{header,nav,button{display:none}}
+main{max-width:980px;margin:0 auto;padding:20px}.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:16px;margin-bottom:16px}
+button,select,input{font:inherit;color:var(--ink);background:var(--surf);border:1px solid var(--line);border-radius:8px;padding:7px 12px;cursor:pointer}
+.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+.row{display:grid;grid-template-columns:140px 1fr 48px 90px;gap:10px;align-items:center;padding:6px 0}.bar{height:10px;background:var(--track);border-radius:6px;overflow:hidden}.bar b{display:block;height:100%}
+.mute{color:var(--mute)}.small{font-size:13px}.tk{display:flex;justify-content:space-between;gap:8px;padding:8px 0;border-bottom:1px solid var(--line);flex-wrap:wrap}
+table{width:100%;border-collapse:collapse}td,th{text-align:left;padding:7px;border-bottom:1px solid var(--line)}code{word-break:break-all}
+</style></head><body>
+<header><div class="logo">Aqua<i>Sense</i></div><span id="who" class="small mute"></span><button id="theme">Theme</button><span id="auth"></span></header>
+<nav id="nav"></nav><main id="app"></main>
+<script>
+const $=s=>document.querySelector(s),esc=s=>String(s??"").replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+const api=async(p,o={})=>{const r=await fetch(p,{headers:{"Content-Type":"application/json"},...o});if(!r.ok)throw new Error((await r.json().catch(()=>({}))).detail||r.status);return r.json()};
+const col=h=>h>=70?"var(--ok)":h>=50?"var(--warn)":"var(--bad)";
+const money=n=>"₹"+Number(n).toLocaleString("en-IN");
+document.documentElement.dataset.theme=localStorage.getItem("aq-theme")||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light");
+$("#theme").onclick=()=>{const n=document.documentElement.dataset.theme==="dark"?"light":"dark";document.documentElement.dataset.theme=n;localStorage.setItem("aq-theme",n)};
+const bars=parts=>Object.entries(parts).map(([n,p])=>`<div class="row"><span>${esc(n)}</span><div class="bar"><b style="width:${p.health}%;background:${col(p.health)}"></b></div><b>${p.health}%</b><span class="small mute">${p.rul_days[0]}–${p.rul_days[1]} d</span></div>`).join("");
+const mlLine=m=>m?`<p class="small mute">ML check: ${m.rul_days!=null?`XGBoost RUL estimate ${m.rul_days} days. `:""}${m.anomaly!=null?(m.anomaly?"Isolation Forest flags an unusual pattern.":"Isolation Forest sees a normal pattern."):""}</p>`:"";
+let ME,DEVS=[];
+const SPEC={tds_in:["TDS in",50,2500,10,"ppm",600],tds_out:["TDS out",5,400,5,"ppm",30],flow:["Flow",.1,2,.05,"L/min",1.2],pressure:["Pressure",1,8,.1,"bar",4.5],current:["Pump current",.4,2.2,.05,"A",1],build:["Build-up",20,140,1,"s",45],uv:["UV hours",0,9000,100,"h",2500],temp:["Temperature",5,45,1,"°C",28]};
+const VIEWS={
+async dash(){let h=`<div class="card"><h2>Add a purifier</h2><input id="dn" placeholder="Kitchen purifier"> <select id="ds"><option>municipal</option><option>borewell</option><option>tanker</option></select> <button id="add" class="pri">Register</button><div id="dk" class="small"></div></div>`;
+ for(const d of DEVS){const x=await api(`/api/devices/${d.id}/health`);h+=`<div class="card"><h2>${esc(d.name)} <span class="small mute">${esc(d.id)} · ${esc(d.source)}</span></h2>`;
+  if(!x.parts){h+='<p class="mute">Waiting for first telemetry. Run the simulator or the ESP32.</p></div>';continue}
+  h+=bars(x.parts)+`<p><b>${esc(x.diagnosis.title)}</b> <span class="small mute">${esc(x.diagnosis.why)}</span></p>`+mlLine(x.ml)+`<button class="pri" data-book="${esc(d.id)}">Book service</button></div>`}
+ $("#app").innerHTML=h;
+ $("#add").onclick=async()=>{try{const r=await api("/api/devices",{method:"POST",body:JSON.stringify({name:$("#dn").value||"My purifier",source:$("#ds").value})});$("#dk").innerHTML=`Device ID <code>${esc(r.id)}</code><br>Key <code>${esc(r.device_key)}</code><br>${esc(r.note)}`}catch(e){$("#dk").textContent=e.message}};
+ document.querySelectorAll("[data-book]").forEach(b=>b.onclick=async()=>{await api("/api/tickets",{method:"POST",body:JSON.stringify({device:b.dataset.book})});go("svc")})},
+async lab(){const v={};for(const k in SPEC)v[k]=SPEC[k][5];
+ $("#app").innerHTML=`<div class="grid"><div class="card"><h2>Telemetry</h2><select id="src"><option>municipal</option><option>borewell</option><option>tanker</option></select>${Object.entries(SPEC).map(([k,[n,a,b,s,u]])=>`<div class="sl"><label>${n}</label><input type="range" id="s-${k}" min="${a}" max="${b}" step="${s}" value="${v[k]}"><span class="small" id="v-${k}">${v[k]} ${u}</span></div>`).join("")}<button id="pw">Simulate pump wear</button></div><div class="card"><h2>Digital twin result</h2><div id="res"></div></div></div>`;
+ let t;const run=async()=>{for(const k in SPEC){v[k]=+$("#s-"+k).value;$("#v-"+k).textContent=v[k]+" "+SPEC[k][4]}try{const r=await api("/api/twin/evaluate",{method:"POST",body:JSON.stringify({...v,source:$("#src").value})});$("#res").innerHTML=bars(r.parts)+`<p><b>${esc(r.diagnosis.title)}</b><br><span class="small mute">${esc(r.diagnosis.why)}</span></p><p>Action: <b>${esc(r.diagnosis.action)}</b></p>`+mlLine(r.ml)}catch(e){$("#res").textContent=e.message}};
+ document.querySelectorAll("#app input,#src").forEach(i=>i.oninput=()=>{clearTimeout(t);t=setTimeout(run,150)});
+ $("#pw").onclick=()=>{$("#s-pressure").value=2.8;$("#s-current").value=1.55;$("#s-build").value=105;run()};run()},
+async svc(){const t=await api("/api/tickets"),cust=ME.role==="customer";
+ $("#app").innerHTML=`<div class="card"><h2>Service requests</h2>${t.length?t.map(x=>`<div class="tk"><span><b>${esc(x.issue)}</b> <span class="small mute">${esc(x.device)} · ${esc(x.action)} · ${new Date(x.ts*1000).toLocaleString()}</span></span>${cust?`<span class="pill">${esc(x.status)}</span>`:`<select data-t="${esc(x.id)}">${["open","scheduled","resolved"].map(s=>`<option${s===x.status?" selected":""}>${s}</option>`).join("")}</select>`}</div>`).join(""):'<p class="mute">None yet. Book one from My purifiers.</p>'}</div>`;
+ document.querySelectorAll("[data-t]").forEach(s=>s.onchange=()=>api("/api/tickets/"+s.dataset.t,{method:"PATCH",body:JSON.stringify({status:s.value})}))},
+async fleet(){const f=await api("/api/fleet");
+ $("#app").innerHTML=`<div class="card"><h2>Fleet</h2><p>Expected repair cost across ${f.devices.length} purifiers: <b>${money(f.expected_repair_cost_inr)}</b></p><table><tr><th>Device</th><th>Name</th><th>Issue</th><th>Part</th><th>Min health</th><th>Expected cost</th></tr>${f.devices.map(d=>`<tr><td>${esc(d.device)}</td><td>${esc(d.name)}</td><td>${esc(d.issue)}</td><td>${esc(d.part)}</td><td>${d.min_health}%</td><td>${money(d.expected_cost_inr)}</td></tr>`).join("")}</table></div>`},
+async tech(){$("#app").innerHTML=`<div class="card"><h2>Technician report</h2><select id="td">${DEVS.map(d=>`<option value="${esc(d.id)}">${esc(d.name)} (${esc(d.id)})</option>`).join("")}</select> <button id="tg" class="pri">Generate report</button> <button onclick="print()">Print</button><div id="tr"></div></div>`;
+ $("#tg").onclick=async()=>{const id=$("#td").value;try{const [x,hs]=await Promise.all([api(`/api/devices/${id}/health`),api(`/api/devices/${id}/history?limit=5`)]);
+  const low=Object.entries(x.parts||{}).filter(([,p])=>p.health<60).map(([n])=>n);
+  $("#tr").innerHTML=x.parts?`<p><b>Likely fault:</b> ${esc(x.diagnosis.title)}</p><p class="small mute">${esc(x.diagnosis.why)}</p>${bars(x.parts)}<p><b>Bring:</b> ${low.length?esc(low.join(", ")):"no parts needed"}</p><pre class="small">${esc(hs.map(r=>JSON.stringify(r)).join("\n"))}</pre>`:"<p class='mute'>No data yet.</p>"}catch(e){$("#tr").textContent=e.message}}}};
+const TABS=[["dash","My purifiers"],["lab","Twin lab"],["svc","Service"],["fleet","Fleet","admin"],["tech","Technician","staff"]];
+function go(k){document.querySelectorAll("#nav button").forEach(b=>b.classList.toggle("on",b.dataset.k===k));VIEWS[k]().catch(e=>$("#app").textContent=e.message)}
+async function init(){ME=await api("/api/me");
+ if(!ME.role){$("#app").innerHTML=`<div class="card"><h1>Sign in</h1><p class="mute">Use your Google account to see your purifier.</p><a href="/auth/login"><button class="pri">Sign in with Google</button></a>${ME.dev_login?'<p class="small mute">Dev mode: <a href="/auth/dev?email=demo@example.com">customer</a> · <a href="/auth/dev?email=admin@example.com">admin</a> · <a href="/auth/dev?email=tech@example.com">technician</a> (technician needs TECH_EMAILS)</p>':""}</div>`;return}
+ $("#who").textContent=`${ME.name||ME.email} · ${ME.role}`;$("#auth").innerHTML='<a href="/auth/logout"><button>Sign out</button></a>';
+ DEVS=await api("/api/devices");
+ const ok=t=>!t[2]||(t[2]==="admin"&&ME.role==="admin")||(t[2]==="staff"&&ME.role!=="customer");
+ $("#nav").innerHTML=TABS.filter(ok).map(t=>`<button data-k="${t[0]}">${t[1]}</button>`).join("");
+ document.querySelectorAll("#nav button").forEach(b=>b.onclick=()=>go(b.dataset.k));go("dash")}
+init().catch(e=>$("#app").textContent=e.message);
+</script></body></html>

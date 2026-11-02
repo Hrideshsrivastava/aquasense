@@ -1,0 +1,244 @@
+<!DOCTYPE html>
+<html lang="en">
+<head>
+<meta charset="utf-8">
+<meta name="viewport" content="width=device-width, initial-scale=1, viewport-fit=cover">
+<title>AquaSense</title>
+<style>
+:root{--bg:#f3f6fa;--surf:#fff;--ink:#14213d;--mute:#5b6781;--line:#dbe2ec;--acc:#c8102e;--blue:#2a6fb5;--ok:#1f8a4c;--warn:#d98a00;--bad:#c8102e;--track:#e6ebf2;
+box-sizing:border-box;padding-top:env(safe-area-inset-top,0px);padding-bottom:env(safe-area-inset-bottom,0px)}
+@media (prefers-color-scheme:dark){:root:not([data-theme="light"]){color-scheme:dark;--bg:#0c1423;--surf:#142036;--ink:#e8eef9;--mute:#97a4bd;--line:#26354f;--acc:#ff4d67;--blue:#6aa6e8;--ok:#43c47a;--warn:#f0ad2e;--bad:#ff5c73;--track:#243450}}
+:root[data-theme="dark"]{color-scheme:dark;--bg:#0c1423;--surf:#142036;--ink:#e8eef9;--mute:#97a4bd;--line:#26354f;--acc:#ff4d67;--blue:#6aa6e8;--ok:#43c47a;--warn:#f0ad2e;--bad:#ff5c73;--track:#243450}
+*{box-sizing:border-box}html{scroll-padding-top:env(safe-area-inset-top,0px)}
+body{margin:0;background:var(--bg);color:var(--ink);font:15px/1.5 system-ui,-apple-system,"Segoe UI",Roboto,sans-serif}
+header{position:sticky;top:env(safe-area-inset-top,0px);z-index:5;background:var(--surf);border-bottom:1px solid var(--line);display:flex;align-items:center;gap:16px;padding:10px 20px;flex-wrap:wrap}
+.logo{font-weight:800;font-size:20px;letter-spacing:-.3px}.logo i{color:var(--acc);font-style:normal}
+nav{display:flex;gap:4px;flex:1;overflow-x:auto}
+nav button{background:none;border:0;color:var(--mute);font:inherit;font-weight:600;padding:8px 12px;border-radius:8px;cursor:pointer;white-space:nowrap}
+nav button[aria-selected=true]{background:var(--ink);color:var(--surf)}
+button:focus-visible,select:focus-visible,input:focus-visible{outline:2px solid var(--blue);outline-offset:2px}
+.tools{display:flex;gap:8px;align-items:center}
+.tools button,.btn{background:var(--surf);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 12px;font:inherit;font-weight:600;cursor:pointer}
+.btn.pri{background:var(--acc);border-color:var(--acc);color:#fff}
+main{max-width:1080px;margin:0 auto;padding:20px}
+h1{font-size:22px;margin:0 0 4px}h2{font-size:16px;margin:0 0 10px}.sub{color:var(--mute);margin:0 0 16px}
+.grid{display:grid;gap:16px;grid-template-columns:repeat(auto-fit,minmax(300px,1fr))}
+.card{background:var(--surf);border:1px solid var(--line);border-radius:12px;padding:16px}
+.row{display:grid;grid-template-columns:130px 1fr 52px 88px;gap:10px;align-items:center;padding:7px 0;border-bottom:1px solid var(--line)}
+.row:last-child{border:0}.bar{height:10px;background:var(--track);border-radius:6px;overflow:hidden}.bar b{display:block;height:100%;border-radius:6px}
+.mute{color:var(--mute)}.small{font-size:13px}
+.alert{border:1px solid var(--warn);border-left-width:5px;border-radius:10px;padding:12px;margin-top:14px}
+.alert.ok{border-color:var(--ok)}.alert.bad{border-color:var(--bad)}.alert.sens{border-color:var(--blue)}
+.pill{display:inline-block;padding:2px 10px;border-radius:99px;font-size:12px;font-weight:700;color:#fff}
+.High{background:var(--bad)}.Medium{background:var(--warn);color:#14213d}.Low{background:var(--ok)}
+.sl{display:grid;grid-template-columns:110px 1fr 70px;gap:8px;align-items:center;margin:6px 0}
+input[type=range]{width:100%;accent-color:var(--acc)}
+select{background:var(--surf);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:7px 10px;font:inherit}
+.tablewrap{overflow-x:auto}table{width:100%;border-collapse:collapse}th,td{text-align:left;padding:9px 10px;border-bottom:1px solid var(--line);white-space:nowrap}
+th{background:var(--ink);color:var(--surf);font-weight:600;cursor:pointer}
+.kpis{display:grid;gap:12px;grid-template-columns:repeat(auto-fit,minmax(150px,1fr));margin-bottom:16px}
+.kpi b{font-size:22px;display:block}
+pre{background:var(--bg);border:1px solid var(--line);border-radius:8px;padding:10px;overflow-x:auto;font-size:12px;max-height:220px}
+svg text{fill:var(--mute);font-size:11px}
+#toast{position:fixed;left:50%;bottom:calc(20px + env(safe-area-inset-bottom,0px));transform:translateX(-50%);background:var(--ink);color:var(--surf);padding:10px 16px;border-radius:10px;opacity:0;pointer-events:none;transition:opacity .2s;max-width:90vw}
+#toast.on{opacity:1}
+#login{position:fixed;inset:0;z-index:20;background:var(--bg);display:flex;align-items:center;justify-content:center;padding:20px;overflow:auto}
+#login .card{max-width:420px;width:100%}
+#login .btn{display:block;width:100%;margin-top:10px;text-align:left}
+.chip{font-size:13px;font-weight:600;padding:5px 10px;border:1px solid var(--line);border-radius:99px;background:var(--bg)}
+.msg{padding:8px 12px;border-radius:10px;margin:6px 0;max-width:90%;white-space:pre-wrap}.msg.user{background:var(--ink);color:var(--surf);margin-left:auto}.msg.assistant{background:var(--bg);border:1px solid var(--line)}
+#chat{min-height:200px;max-height:380px;overflow-y:auto;margin-bottom:10px}
+.ask{display:flex;gap:8px}.ask input{flex:1;background:var(--surf);color:var(--ink);border:1px solid var(--line);border-radius:8px;padding:9px 12px;font:inherit}
+.tk{display:flex;gap:10px;align-items:center;justify-content:space-between;flex-wrap:wrap;padding:8px 0;border-bottom:1px solid var(--line)}
+[hidden]{display:none!important}
+@media(max-width:560px){.row{grid-template-columns:100px 1fr 44px;}.row .rul{grid-column:1/-1;font-size:12px;color:var(--mute)}}
+@media print{header,.noprint{display:none}body{background:#fff;color:#000}}
+@media (prefers-reduced-motion:reduce){*{transition:none!important}}
+</style>
+</head>
+<body>
+<header>
+<div class="logo">Aqua<i>Sense</i></div>
+<nav role="tablist" id="tabs"></nav>
+<div class="tools"><span id="who" class="chip" hidden></span><button id="out" hidden>Sign out</button>
+<select id="src" aria-label="Water source"><option value="municipal">Municipal</option><option value="borewell">Borewell</option><option value="tanker">Tanker</option></select>
+<button id="theme" aria-label="Toggle bright or dark mode"></button>
+</div>
+</header>
+<div id="login"><div class="card"><div class="logo" style="font-size:26px">Aqua<i>Sense</i></div><p class="mute">Sign in to see your purifier, book service and ask questions.</p><div id="lbody"><p class="mute small">Checking sign-in…</p></div><p class="small mute" style="margin-top:16px">Sign-in uses your claude.ai account. Google Sign-In cannot load on a hosted page, so a real Gmail login needs your own backend (see the notes in chat).</p></div></div>
+<main>
+<section id="p-portal">
+<h1>My purifier</h1><p class="sub">Live component health, alerts and service booking. <span class="pill Low" id="conn">Connected</span></p>
+<div class="grid"><div class="card"><h2>Component health</h2><div id="health"></div></div>
+<div class="card"><h2>Alerts</h2><div id="alerts"></div><p class="small mute">Health scores come from the digital twin on the Twin tab. Change a reading there and this view updates.</p></div><div class="card"><h2>My service requests</h2><div id="mybook"><p class="mute small">No requests yet.</p></div></div></div>
+</section>
+
+<section id="p-twin" hidden>
+<h1>Digital twin</h1><p class="sub">Adjust telemetry to see how the twin scores each part, cross-checks signals and forecasts remaining useful life.</p>
+<div class="grid"><div class="card"><h2>Telemetry</h2><div id="sliders"></div><button class="btn" id="reset">Reset readings</button> <button class="btn" id="fault">Simulate pump wear</button></div>
+<div class="card"><h2>Diagnosis</h2><div id="diag"></div><h2 style="margin-top:16px">Lowest component forecast</h2><div id="chart"></div></div></div>
+</section>
+
+<section id="p-console" hidden>
+<h1>Service console</h1><p class="sub">Predicted visits, parts forecast and expected repair cost across the fleet.</p>
+<div class="kpis" id="kpis"></div>
+<div class="card"><div style="display:flex;gap:10px;margin-bottom:10px;flex-wrap:wrap"><select id="flt" aria-label="Filter priority"><option value="">All priorities</option><option>High</option><option>Medium</option><option>Low</option></select><button class="btn" id="csv">Export CSV</button></div>
+<div class="tablewrap"><table><thead><tr id="thead"></tr></thead><tbody id="tbody"></tbody></table></div></div>
+<div class="card" style="margin-top:16px"><h2>Live service requests</h2><div id="tix"><p class="mute small">No requests yet.</p></div></div>
+<div class="card" style="margin-top:16px"><h2>Parts to stock this month</h2><div id="parts"></div></div>
+</section>
+
+<section id="p-tech" hidden>
+<h1>Technician device</h1><p class="sub">Works offline. Insert the purifier’s SD card, run the models on the device and get the right part on the first visit.</p>
+<div class="grid"><div class="card"><h2>SD card log</h2><p class="small mute">Reads the last 5 readings from the card (simulated from the current twin).</p>
+<button class="btn pri" id="read">Read SD card</button> <button class="btn" id="print">Print report</button> <button class="btn" id="dl">Save report</button><pre id="log">No card loaded.</pre></div>
+<div class="card"><h2>Offline report</h2><div id="rep"><p class="mute">Load a card to see component health, likely fault and parts plan.</p></div></div></div>
+</section>
+
+<section id="p-assistant" hidden>
+<h1>Ask AquaSense</h1><p class="sub">Ask about your purifier in plain language. Answers use your current readings and health scores.</p>
+<div class="card"><div id="chat" aria-live="polite"></div><div class="ask"><input id="q" placeholder="Why is my pump alert showing?" aria-label="Your question"><button class="btn pri" id="ask">Ask</button></div><p class="small mute">Estimates only. This is not a water-safety certification.</p></div>
+</section>
+<section id="p-about" hidden>
+<h1>About AquaSense</h1><p class="sub">From purifiers to intelligent water ecosystems.</p>
+<div class="card"><p>AquaSense adds a component-level digital twin to connected purifiers. It scores each part, forecasts remaining useful life with a confidence range, and cross-checks signals before naming a cause, so sensor faults are not mistaken for wear.</p>
+<p class="small mute">Prototype notes: this demo runs rule-based scoring in your browser on synthetic data. The full design uses XGBoost, Isolation Forest and SHAP behind a FastAPI service. RUL is an estimate, not a water-safety certification.</p></div>
+</section>
+</main>
+<div id="toast" role="status"></div>
+<script>
+const $=s=>document.querySelector(s),cl=(v,a=0,b=1)=>Math.max(a,Math.min(b,v));
+const DEF={tdsIn:600,tdsOut:30,flow:1.2,pressure:4.5,current:1.0,build:45,uv:2500,temp:28};
+const SPEC={tdsIn:["TDS in",50,2500,10,"ppm"],tdsOut:["TDS out",5,400,5,"ppm"],flow:["Flow",0.1,2,0.05,"L/min"],pressure:["Pressure",1,8,0.1,"bar"],current:["Pump current",0.4,2.2,0.05,"A"],build:["Build-up time",20,140,1,"s"],uv:["UV hours",0,9000,100,"h"],temp:["Temperature",5,45,1,"°C"]};
+const SRC={municipal:{k:1,tds:300},borewell:{k:.8,tds:900},tanker:{k:.65,tds:1500}};
+let T={...DEF},theme=null;
+function toast(m){const t=$("#toast");t.textContent=m;t.classList.add("on");clearTimeout(toast.h);toast.h=setTimeout(()=>t.classList.remove("on"),2400)}
+/* theme */
+function applyTheme(t){theme=t;document.documentElement.setAttribute("data-theme",t);$("#theme").textContent=t==="dark"?"☀ Bright":"☾ Dark";try{localStorage.setItem("aq-theme",t)}catch(e){}}
+(function(){let s=null;try{s=localStorage.getItem("aq-theme")}catch(e){}
+applyTheme(s||(matchMedia("(prefers-color-scheme:dark)").matches?"dark":"light"))})();
+$("#theme").onclick=()=>applyTheme(theme==="dark"?"light":"dark");
+/* twin model */
+function model(t){
+const k=SRC[$("#src").value].k, rej=1-t.tdsOut/t.tdsIn;
+const lowP=t.pressure<3.5, highP=t.pressure>5.5, lowF=t.flow<0.8;
+const curDev=Math.abs(t.current-1)/.6, bDev=cl((t.build-45)/60,0,1.5);
+const H={
+ "Sediment":100*(1-cl((highP?(t.pressure-4.5)/3:0)+(lowF?(1.2-t.flow)/1.1:0))),
+ "Carbon":100*(1-cl(((t.pressure-4.5)>0?(t.pressure-4.5)/5:0)+(1.2-t.flow>0?(1.2-t.flow)/1.6:0))),
+ "RO membrane":cl((rej-.8)/.17)*100,
+ "Booster pump / motor":100*(1-cl(.55*curDev+.5*bDev)),
+ "UV lamp":100*(1-cl(t.uv/9000))};
+const kd={"Sediment":1.5,"Carbon":1.7,"RO membrane":1.4,"Booster pump / motor":1.3,"UV lamp":3.2};
+const R={};for(const c in H){H[c]=Math.round(H[c]);const d=Math.max(0,H[c]-40)*kd[c]*(c==="UV lamp"?1:k);R[c]=[Math.round(d*.88),Math.round(d*1.12)]}
+/* cross-check */
+let status="ok",title="All signals agree. No fault suspected.",why="Readings are consistent across the filtration path.",act="Monitor";
+const sensor=t.tdsOut>t.tdsIn||(lowP&&t.flow>1.5)||(highP&&t.flow>1.6)||(t.current<.5&&t.build<30);
+if(sensor){status="sens";title="Sensor fault suspected";why="Signals disagree (for example, TDS out above TDS in, or pressure and flow that cannot both be true). Check the sensor before replacing parts.";act="Inspect sensor"}
+else{
+ const pumpBad=lowP&&curDev>.25&&t.build>60, worst=Object.entries(H).sort((a,b)=>a[1]-b[1])[0];
+ if(pumpBad){status="bad";title="Pump degradation";why=`Low pressure (${t.pressure} bar) with abnormal pump current (${t.current} A) and slow build-up (${t.build} s). All three agree, so the pump is named.`;act="Inspect pump"}
+ else if(lowP&&curDev<=.25){status="warn";title="Low supply pressure";why="Pressure is low but pump current and build-up are normal, so the pump is not blamed. Check the inlet supply.";act="Monitor"}
+ else if(rej<.88&&H["RO membrane"]<70){status="warn";title="Membrane wear";why=`TDS rejection is ${(rej*100).toFixed(0)}%, below the healthy range.`;act=H["RO membrane"]<50?"Replace":"Inspect"}
+ else if(lowF&&highP){status="warn";title="Filter clogging";why="Low flow with high pressure points to a blocked pre-filter.";act=Math.min(H.Sediment,H.Carbon)<50?"Replace":"Inspect"}
+ else if(worst[1]<60){status="warn";title=worst[0]+" ageing";why="Health is falling toward the 40% replacement threshold.";act="Monitor"}}
+return{H,R,status,title,why,act,rej}}
+const col=h=>h>=70?"var(--ok)":h>=50?"var(--warn)":"var(--bad)";
+/* render */
+function render(){const m=model(T);window.M=m;
+$("#health").innerHTML=Object.entries(m.H).map(([c,h])=>`<div class="row"><span>${c}</span><div class="bar"><b style="width:${h}%;background:${col(h)}"></b></div><strong>${h}%</strong><span class="rul small mute">${m.R[c][0]}–${m.R[c][1]} days</span></div>`).join("");
+const cls={ok:"ok",warn:"",bad:"bad",sens:"sens"}[m.status];
+$("#alerts").innerHTML=`<div class="alert ${cls}"><strong>${m.title}</strong><div class="small mute">${m.why}</div><p style="margin:8px 0 0"><b>Action: ${m.act}</b></p>${m.status==="ok"?"":'<button class="btn pri" style="margin-top:8px" id="book">Book service</button>'}</div>`;
+const b=$("#book");if(b)b.onclick=()=>book(m);
+const lowest=Object.entries(m.H).sort((a,b)=>a[1]-b[1])[0];
+$("#diag").innerHTML=`<div class="alert ${cls}" style="margin:0"><strong>${m.title}</strong><div class="small mute">${m.why}</div><p style="margin:8px 0 0"><b>Action: ${m.act}</b></p></div><p class="small mute">TDS rejection ${(m.rej*100).toFixed(0)}% · source ${$("#src").value}</p>`;
+chart(lowest[0],lowest[1],m.R[lowest[0]]);saveSoon();
+}
+function chart(name,h,r){const W=420,Hh=200,x=d=>30+(d+60)/120*(W-40),y=v=>10+(100-v)/100*(Hh-35);
+const slope=-.45*(h>40?1:0)||-.1,pts=[];for(let d=-60;d<=0;d+=6)pts.push([d,Math.min(100,h-slope*(-d)*0+(-d)*(-slope)*-1*-1)]);
+const hist=pts.map(([d])=>[d,Math.min(100,h+(-d)*.35)]);
+const end=r[1]?h/(Math.max(1,(r[0]+r[1])/2)/ (h-40>0?(h-40):1)):0;
+const rate=r[1]>0?(h-40)/((r[0]+r[1])/2):0.3;
+const f=d=>h-rate*d,mid=(r[0]+r[1])/2;
+const line=hist.map(([d,v],i)=>(i?"L":"M")+x(d)+","+y(v)).join(" ");
+const hi=[0,60].map(d=>[d,h-rate*d*.88]),lo=[0,60].map(d=>[d,h-rate*d*1.12]);
+$("#chart").innerHTML=`<svg viewBox="0 0 ${W} ${Hh}" width="100%" role="img" aria-label="RUL forecast for ${name}">
+<line x1="30" x2="${W-10}" y1="${y(40)}" y2="${y(40)}" stroke="var(--warn)" stroke-dasharray="4 3"/><text x="34" y="${y(40)-4}">Replace at 40%</text>
+<line x1="${x(0)}" x2="${x(0)}" y1="10" y2="${Hh-25}" stroke="var(--line)"/>
+<path d="${line}" fill="none" stroke="var(--ink)" stroke-width="2"/>
+<polygon points="${x(0)},${y(h)} ${x(60)},${y(cl(hi[1][1],0,100))} ${x(60)},${y(cl(lo[1][1],0,100))}" fill="var(--acc)" opacity=".18"/>
+<line x1="${x(0)}" y1="${y(h)}" x2="${x(60)}" y2="${y(cl(f(60),0,100))}" stroke="var(--acc)" stroke-width="2" stroke-dasharray="5 3"/>
+<circle cx="${x(0)}" cy="${y(h)}" r="4" fill="var(--ink)"/>
+${[-60,-30,0,30,60].map(d=>`<text x="${x(d)-8}" y="${Hh-8}">${d>0?"+":""}${d}</text>`).join("")}
+<text x="${x(0)+6}" y="22">Today</text></svg><p class="small"><b>${name}:</b> ${h}% health, RUL ${r[0]}–${r[1]} days</p>`}
+/* sliders */
+$("#sliders").innerHTML=Object.entries(SPEC).map(([k,[n,a,b,s,u]])=>`<div class="sl"><label for="s-${k}">${n}</label><input type="range" id="s-${k}" min="${a}" max="${b}" step="${s}" value="${T[k]}"><span class="small" id="v-${k}"></span></div>`).join("");
+function syncS(){for(const k in SPEC){$("#s-"+k).value=T[k];$("#v-"+k).textContent=(+T[k]).toFixed(SPEC[k][3]<1?2:0)+" "+SPEC[k][4]}}
+for(const k in SPEC)$("#s-"+k).oninput=e=>{T[k]=+e.target.value;syncS();render()};
+$("#reset").onclick=()=>{T={...DEF,tdsIn:SRC[$("#src").value].tds};syncS();render();toast("Readings reset")};
+$("#fault").onclick=()=>{Object.assign(T,{pressure:2.8,current:1.55,build:105});syncS();render();toast("Pump wear simulated")};
+$("#src").onchange=()=>{T.tdsIn=SRC[$("#src").value].tds;syncS();render();renderConsole()};
+/* fleet */
+const FLEET=[["H-1042","Pump degradation","Booster pump",.82,2400,"3–5 days"],["H-2210","RO membrane wear","RO membrane",.55,3200,"2–3 weeks"],["H-0871","Sediment clogging","Sediment filter",.6,450,"10 days"],["H-3305","Sensor fault","TDS sensor",.3,600,"Remote check"],["H-1177","Valve wear","Inlet valve",.42,900,"3 weeks"],["H-4120","UV lamp ageing","UV lamp",.35,1100,"5 weeks"],["H-5093","Pump degradation","Booster pump",.7,2400,"1 week"],["H-2764","Electronics fault","Control board",.2,1800,"Remote check"]].map(r=>({home:r[0],issue:r[1],part:r[2],p:r[3],cost:r[4],win:r[5],pri:r[3]>.65?"High":r[3]>.4?"Medium":"Low",exp:Math.round(r[3]*r[4])}));
+let sortK="p",sortD=-1;const COLS=[["home","Home"],["issue","Predicted issue"],["part","Part"],["pri","Priority"],["win","Visit window"],["p","Failure prob."],["exp","Expected cost (₹)"]];
+function renderConsole(){const f=$("#flt").value;let d=FLEET.filter(r=>!f||r.pri===f).sort((a,b)=>(a[sortK]>b[sortK]?1:-1)*sortD);
+$("#thead").innerHTML=COLS.map(([k,n])=>`<th data-k="${k}" tabindex="0">${n}${sortK===k?(sortD>0?" ▲":" ▼"):""}</th>`).join("");
+$("#thead").querySelectorAll("th").forEach(th=>{const go=()=>{const k=th.dataset.k;sortD=sortK===k?-sortD:-1;sortK=k;renderConsole()};th.onclick=go;th.onkeydown=e=>{if(e.key==="Enter")go()}});
+$("#tbody").innerHTML=d.map(r=>`<tr><td>${r.home}</td><td>${r.issue}</td><td>${r.part}</td><td><span class="pill ${r.pri}">${r.pri}</span></td><td>${r.win}</td><td>${Math.round(r.p*100)}%</td><td>₹${r.exp.toLocaleString("en-IN")}</td></tr>`).join("")||'<tr><td colspan="7" class="mute">No visits match this filter.</td></tr>';
+const tot=FLEET.reduce((s,r)=>s+r.exp,0),hi=FLEET.filter(r=>r.pri==="High").length;
+$("#kpis").innerHTML=`<div class="card kpi"><b>${FLEET.length}</b>Predicted visits</div><div class="card kpi"><b>${hi}</b>High priority</div><div class="card kpi"><b>₹${tot.toLocaleString("en-IN")}</b>Expected repair cost</div><div class="card kpi"><b>${$("#src").value}</b>Water source model</div>`;
+const parts={};FLEET.forEach(r=>parts[r.part]=(parts[r.part]||0)+r.p);
+$("#parts").innerHTML=Object.entries(parts).sort((a,b)=>b[1]-a[1]).map(([p,v])=>`<div class="row" style="grid-template-columns:150px 1fr 60px"><span>${p}</span><div class="bar"><b style="width:${cl(v/1.6)*100}%;background:var(--blue)"></b></div><span class="small">${Math.ceil(v)} unit${Math.ceil(v)>1?"s":""}</span></div>`).join("")}
+$("#flt").onchange=renderConsole;
+$("#csv").onclick=()=>{const rows=[COLS.map(c=>c[1]),...FLEET.map(r=>COLS.map(c=>r[c[0]]))].map(r=>r.join(",")).join("\n");try{const a=document.createElement("a");a.href=URL.createObjectURL(new Blob([rows],{type:"text/csv"}));a.download="aquasense-visits.csv";a.click()}catch(e){navigator.clipboard&&navigator.clipboard.writeText(rows);toast("Download blocked here. CSV copied instead.")}};
+/* technician */
+$("#read").onclick=()=>{const L=[];for(let i=4;i>=0;i--){const j=n=>+(n*(1+(Math.random()-.5)*.04)).toFixed(2);L.push(`t-${i}d tdsIn=${j(T.tdsIn)} tdsOut=${j(T.tdsOut)} flow=${j(T.flow)} P=${j(T.pressure)} I=${j(T.current)} build=${j(T.build)}s uv=${T.uv}h`)}
+$("#log").textContent=L.join("\n");const m=model(T);
+const parts=Object.entries(m.H).filter(([,h])=>h<60).map(([c])=>c);
+$("#rep").innerHTML=`<p><b>Likely fault:</b> ${m.title}</p><p class="small mute">${m.why}</p>`+Object.entries(m.H).map(([c,h])=>`<div class="row" style="grid-template-columns:140px 1fr 44px"><span>${c}</span><div class="bar"><b style="width:${h}%;background:${col(h)}"></b></div><strong>${h}%</strong></div>`).join("")+`<p><b>Bring:</b> ${parts.length?parts.join(", "):"no parts needed"}</p><p class="small mute">Inference ran on this device with no internet. Log syncs when connected.</p>`;toast("Card read. Report ready.")};
+$("#print").onclick=()=>window.print();
+/* tabs */
+const ALL=[["portal","My purifier"],["twin","Digital twin"],["assistant","Ask AquaSense"],["console","Service console"],["tech","Technician"],["about","About"]];let TABS=ALL;
+$("#tabs").innerHTML=TABS.map(([k,n])=>`<button role="tab" data-k="${k}">${n}</button>`).join("");
+function show(k){ALL.forEach(([t])=>{$("#p-"+t).hidden=t!==k});document.querySelectorAll("#tabs button").forEach(b=>b.setAttribute("aria-selected",b.dataset.k===k))}
+document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>show(b.dataset.k));
+syncS();render();renderConsole();show("portal");
+/* auth, roles, data */
+let ROLE=null,UID=null,UNAME="Guest",DB=null,USER=null,tickets=[],LOADED=false,WATCH=false,st;
+const ROLES={customer:["portal","twin","assistant","about"],technician:["portal","twin","assistant","tech","about"],admin:["portal","twin","assistant","console","tech","about"]};
+const LBL={customer:"Customer",technician:"Technician",admin:"Atomberg admin"};
+const esc=s=>String(s).replace(/[&<>"]/g,c=>({"&":"&amp;","<":"&lt;",">":"&gt;",'"':"&quot;"}[c]));
+function buildTabs(){TABS=ALL.filter(([k])=>ROLES[ROLE].includes(k));$("#tabs").innerHTML=TABS.map(([k,n])=>`<button role="tab" data-k="${k}">${n}</button>`).join("");document.querySelectorAll("#tabs button").forEach(b=>b.onclick=()=>show(b.dataset.k))}
+function enter(r){ROLE=r;$("#login").hidden=true;$("#who").hidden=$("#out").hidden=false;$("#who").textContent=UNAME+" · "+LBL[r];buildTabs();show("portal");loadData();watchTickets();renderTickets()}
+$("#out").onclick=()=>{ROLE=null;$("#login").hidden=false;$("#who").hidden=$("#out").hidden=true;$("#tabs").innerHTML=""};
+async function loadData(){if(!DB||!UID||LOADED)return;try{const s=await DB.doc("data/users/"+UID+"/purifier").get();if(s.exists){const d=s.data();if(d.T)T={...DEF,...d.T};if(d.src)$("#src").value=d.src;syncS();render();renderConsole();toast("Welcome back. Your readings were restored.")}}catch(e){}LOADED=true}
+function saveSoon(){if(!LOADED||!DB||!UID)return;clearTimeout(st);st=setTimeout(()=>{DB.doc("data/users/"+UID+"/purifier").set({T,src:$("#src").value}).catch(()=>{})},800)}
+async function book(m){const id="t"+Date.now().toString(36),who=UID||"demo";const t={uid:who,home:"H-"+who.slice(-4),issue:m.title,action:m.act,health:Math.min(...Object.values(m.H)),status:"open",ts:Date.now()};
+if(DB&&UID){try{await DB.collection("tickets").doc(id).set(t);toast("Service requested. Track it under My service requests.");return}catch(e){}}
+tickets.unshift({id,...t});renderTickets();toast(DB?"Saved on this device only. Sharing was refused.":"Service requested (demo mode).")}
+async function setStatus(id,s){try{if(DB&&UID)await DB.collection("tickets").doc(id).update({status:s});else throw 0}catch(e){const t=tickets.find(x=>x.id===id);if(t)t.status=s;renderTickets()}}
+function renderTickets(){const me=UID||"demo",mine=tickets.filter(t=>t.uid===me);
+$("#mybook").innerHTML=mine.length?mine.map(t=>`<div class="tk"><span><b>${esc(t.issue)}</b><br><span class="small mute">${new Date(t.ts).toLocaleString()} · ${esc(t.action)}</span></span><span class="pill ${t.status==="open"?"Medium":t.status==="scheduled"?"Low":"Low"}">${esc(t.status)}</span></div>`).join(""):'<p class="mute small">No requests yet.</p>';
+$("#tix").innerHTML=tickets.length?tickets.map(t=>`<div class="tk"><span><b>${esc(t.home)}</b> · ${esc(t.issue)}<br><span class="small mute">${esc(t.action)} · lowest health ${t.health}% · ${new Date(t.ts).toLocaleString()}</span></span><span><select data-id="${t.id}" aria-label="Status">${["open","scheduled","resolved"].map(s=>`<option${s===t.status?" selected":""}>${s}</option>`).join("")}</select></span></div>`).join(""):'<p class="mute small">No requests yet.</p>';
+document.querySelectorAll("#tix select").forEach(s=>s.onchange=()=>setStatus(s.dataset.id,s.value))}
+function watchTickets(){if(WATCH||!DB)return;WATCH=true;try{DB.collection("tickets").onSnapshot(s=>{tickets=s.docs.map(d=>({id:d.id,...d.data()})).sort((a,b)=>b.ts-a.ts);renderTickets()},()=>{})}catch(e){}}
+/* assistant */
+const chat=[];
+function paint(){const c=$("#chat");c.innerHTML=chat.length?chat.map(x=>`<div class="msg ${x.role}">${esc(x.content)}</div>`).join(""):'<p class="mute small">Try: “Is my RO membrane okay?” or “When should I change the filters?”</p>';c.scrollTop=c.scrollHeight}
+function localAnswer(){const m=model(T);return `${m.title}. ${m.why} Suggested action: ${m.act}. (Offline answer: the AI assistant is not available here.)`}
+async function ask(){const q=$("#q").value.trim();if(!q)return;$("#q").value="";chat.push({role:"user",content:q});paint();
+let sm=null;try{sm=window.claude&&await claude.use("sample")}catch(e){}
+if(!sm){chat.push({role:"assistant",content:localAnswer()});paint();return}
+const m=model(T),ctx=`You are AquaSense, a concise assistant for an RO purifier owner in India. Use only this data. Water source: ${$("#src").value}. Telemetry: ${JSON.stringify(T)}. Health %: ${JSON.stringify(m.H)}. Remaining life in days [low,high]: ${JSON.stringify(m.R)}. Diagnosis: ${m.title}. Answer in under 120 words. Never say the water is safe to drink; RUL is an estimate.`;
+const hist=chat.map(c=>c.role+": "+c.content).join("\n");chat.push({role:"assistant",content:"Thinking…"});paint();
+try{const r=await sm([{role:"user",content:ctx+"\n\nConversation so far:\n"+hist}],{cache:false,onText:({text})=>{chat[chat.length-1].content=text;paint()}});chat[chat.length-1].content=r.text}catch(e){chat[chat.length-1].content=localAnswer()}paint()}
+$("#ask").onclick=ask;$("#q").onkeydown=e=>{if(e.key==="Enter")ask()};paint();
+$("#dl").onclick=async()=>{let d=null;try{d=window.claude&&await claude.use("downloads")}catch(e){}const txt="AquaSense technician report\n\n"+$("#rep").innerText+"\n\nSD log\n"+$("#log").textContent;if(d){try{await d.save({filename:"aquasense-report.txt",data:txt})}catch(e){}}else toast("Saving is not available here. Use Print report.")};
+/* login */
+(async()=>{let admin=false;try{USER=window.claude&&await claude.use("user");if(USER){const me=await USER.me();UID=await USER.id();UNAME=me.name||"Signed-in user";admin=await USER.isOwner();DB=await claude.use("db")}}catch(e){}
+const b=[];if(UID)b.push(`<p>Signed in as <b>${esc(UNAME)}</b>.</p><button class="btn pri" data-r="${admin?"admin":"customer"}">Continue as ${admin?"Atomberg admin":"customer"}</button>`);
+if(!UID||admin){b.push(`<p class="small mute" style="margin-top:14px">${UID?"Preview other roles":"Demo mode. Pick a role to explore"}</p>`);Object.keys(LBL).forEach(r=>{if(!(UID&&admin&&r==="admin"))b.push(`<button class="btn" data-r="${r}">${LBL[r]}</button>`)})}
+$("#lbody").innerHTML=b.join("");document.querySelectorAll("#lbody [data-r]").forEach(x=>x.onclick=()=>enter(x.dataset.r))})();
+</script>
+</body>
+</html>
