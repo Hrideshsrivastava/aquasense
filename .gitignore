@@ -1,6 +1,16 @@
 .env
 *.db
+*.db-wal
+*.db-shm
 __pycache__/
+*.pyc
 venv/
 .venv/
-
+.pytest_cache/
+# runtime data (the virtual rig's SD card, generated datasets)
+data/aquasense.db*
+data/sdcard/
+data/synthetic_rig/
+data/rig_runs/*.csv
+!data/rig_runs/README.md
+logs/

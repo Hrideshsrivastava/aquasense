@@ -1,0 +1,4 @@
+run_id,start,end,class,level,salt_ppm,sensor_mode,notes
+R001,2026-11-10T10:02:00,2026-11-10T10:09:30,0,0,300,,example: fresh membrane
+R002,2026-11-10T10:15:00,2026-11-10T10:22:00,1,2,300,,example: CLOG valve to mark 2
+R003,2026-11-10T10:30:00,2026-11-10T10:37:00,4,1,800,tds_out_unplugged,example: TDS-out probe unplugged

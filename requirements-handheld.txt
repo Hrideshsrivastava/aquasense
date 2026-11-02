@@ -1,0 +1,8 @@
+# Raspberry Pi handheld (Unit B). Tkinter comes with Raspberry Pi OS
+# (sudo apt install python3-tk if missing). Use the same scikit-learn /
+# xgboost versions as the laptop so the joblib model files load unchanged.
+numpy>=1.26
+pandas>=2.1
+scikit-learn==1.9.1
+xgboost==3.4.1
+joblib>=1.3

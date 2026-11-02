@@ -1,0 +1,73 @@
+{
+  "trained_at": "2026-11-02T19:25:33",
+  "data_source": "SYNTHETIC rig data (aquasense/rigsim.py, protocol of build plan 8.1)",
+  "simulated": true,
+  "runs": 45,
+  "rows": 9959,
+  "windows": 548,
+  "held_out_runs": 16,
+  "classifier": "xgboost",
+  "macro_f1_model_only": 0.895,
+  "macro_f1_with_cross_check": 1.0,
+  "f1_per_class": {
+    "Normal": 1.0,
+    "Filter/line clogging": 1.0,
+    "Pump weakness": 1.0,
+    "Membrane wear": 1.0,
+    "Sensor fault": 1.0
+  },
+  "run_level_accuracy": 1.0,
+  "high_tds_normal_false_alarm_rate": 0.0,
+  "health_mae_points": {
+    "pump": 0.78,
+    "membrane": 1.53,
+    "filter": 2.64
+  },
+  "rul": {
+    "pump": {
+      "trend": {
+        "coverage_range": 0.857,
+        "median_abs_error_days": 78.5,
+        "train_points": 3864,
+        "test_points": 965
+      },
+      "notrend": {
+        "coverage_range": 0.869,
+        "median_abs_error_days": 77.6,
+        "train_points": 3864,
+        "test_points": 965
+      }
+    },
+    "membrane": {
+      "trend": {
+        "coverage_range": 0.806,
+        "median_abs_error_days": 35.9,
+        "train_points": 3774,
+        "test_points": 943
+      },
+      "notrend": {
+        "coverage_range": 0.788,
+        "median_abs_error_days": 45.0,
+        "train_points": 3774,
+        "test_points": 943
+      }
+    },
+    "filter": {
+      "trend": {
+        "coverage_range": 0.843,
+        "median_abs_error_days": 15.7,
+        "train_points": 3588,
+        "test_points": 897
+      },
+      "notrend": {
+        "coverage_range": 0.796,
+        "median_abs_error_days": 20.0,
+        "train_points": 3588,
+        "test_points": 897
+      }
+    }
+  },
+  "rul_note": "RUL models are trained on simulated run-to-failure data (aquasense/degradation.py).",
+  "anomaly_threshold": -0.0506,
+  "train_seconds": 37.8
+}
