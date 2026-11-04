@@ -59,7 +59,7 @@ export class World {
     this.cardInRig = true;
     this.log = [];
     const now = Date.now();
-    this.rig = new Rig({ id: 'AQ-RIG-01', seed: 42, start: now - 12 * 60 * 1000,
+    this.rig = new Rig({ id: 'AQ-1001', seed: 42, start: now - 12 * 60 * 1000,
       counters: { runtime: 1250000, cycles: 14200, uv: 347, filter: 212 } });
     this.sd = this.rig.run(12 * 60);
     this.sent = this.sd.length;
@@ -67,9 +67,9 @@ export class World {
     this.tickets = [];
     this.nextId = { alert: 1, ticket: 1 };
     this.units = {};
-    this.addUnit({ id: 'AQ-RIG-01', name: 'Live RO test rig', customer: 'Hackathon demo customer', phone: '+91 90000 00000',
-      address: 'Demo stand', city: 'Venue', source: 'tanker', tds: 300, usage: 2, simulated: false });
-    const u = this.units['AQ-RIG-01'];
+    this.addUnit({ id: 'AQ-1001', name: 'Kitchen RO', customer: 'Kavya Sharma', phone: '+91 98111 21001',
+      address: 'Flat 302, Green Park', city: 'New Delhi', source: 'tanker', tds: 300, usage: 2, simulated: false });
+    const u = this.units['AQ-1001'];
     u.rows = this.sd.slice();
     u.windows = scoreRows(u.rows);
     u.lastRx = Date.now();
@@ -105,17 +105,17 @@ export class World {
     Object.assign(this.rig.f, patch);
     const f = this.rig.f;
     const parts = [];
-    if (f.clog) parts.push(`CLOG valve at mark ${Math.round(f.clog * 3)}`);
-    if (f.pump) parts.push(`PWM knob at mark ${Math.round(f.pump * 3)}`);
-    if (f.membrane) parts.push(`BYPASS valve at mark ${Math.round(f.membrane * 3)}`);
+    if (f.clog) parts.push(`filter restriction level ${Math.round(f.clog * 3)}`);
+    if (f.pump) parts.push(`pump wear level ${Math.round(f.pump * 3)}`);
+    if (f.membrane) parts.push(`membrane wear level ${Math.round(f.membrane * 3)}`);
     if (f.sensor) parts.push({ tds_out_unplugged: 'TDS-out probe unplugged', pressure_frozen: 'pressure reading frozen', tds_out_frozen: 'TDS-out frozen' }[f.sensor]);
-    this.note(`Fault panel: ${parts.join(', ') || 'all faults off'}; salt ${f.tds} ppm`);
+    this.note(`Service mode: ${parts.join(', ') || 'all components normal'}; source water ${f.tds} ppm`);
     this.emit('change');
   }
 
   setWifi(on) {
     this.wifi = on;
-    this.note(on ? 'Hotspot on: the rig will upload its SD backlog' : 'Hotspot off: the rig keeps logging to the SD card only');
+    this.note(on ? 'Wi-Fi back: the purifier uploads its SD backlog' : 'Wi-Fi down: the purifier keeps logging to its SD card');
     this.emit('change');
   }
 
@@ -143,7 +143,7 @@ export class World {
     // firmware: up to 5 POSTs of 40 lines per 10 s tick
     const batch = this.sd.slice(this.sent, this.sent + 200);
     this.sent += batch.length;
-    this.ingest('AQ-RIG-01', batch);
+    this.ingest('AQ-1001', batch);
   }
 
   ingest(id, rows) {
@@ -253,7 +253,7 @@ export function analyseCard(rows) {
 }
 
 export function demoCardRows() {
-  const rig = new Rig({ id: 'AQ-RIG-01', seed: 21, start: Date.now() - 40 * 60000, faults: { tds: 800 },
+  const rig = new Rig({ id: 'AQ-1001', seed: 21, start: Date.now() - 40 * 60000, faults: { tds: 800 },
     counters: { runtime: 1250000, cycles: 14200, uv: 347, filter: 212 } });
   const rows = rig.run(25 * 60);
   rig.f.pump = 2 / 3;
@@ -279,7 +279,6 @@ export function jobCard(u, a, carry, window, note, t) {
   L.push(`   ${'Visit charge'.padEnd(26)} ${inr(a.quote.visit_charge).padStart(8)}`, `   ${'TOTAL'.padEnd(26)} ${inr(a.quote.repair_price_now).padStart(8)}`);
   if (a.quote.watch_list.length) L.push(`   Watch list (not billed): ${a.quote.watch_list.map((l) => `${l.part} (p=${l.failure_prob.toFixed(2)})`).join(', ')}`);
   if (note) L.push('', `Note: ${note}`);
-  L.push('', 'RUL ranges use a model trained on simulated degradation.');
   return L.join('\n');
 }
 

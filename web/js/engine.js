@@ -36,7 +36,7 @@ export const BASE = { p0: 5.5, q0: 0.6, i0: 0.95, rej0: 0.955, tau0: 1.1 };
 const BASE_BUILDUP = -BASE.tau0 * Math.log(1 - 0.8);
 
 export class Rig {
-  constructor({ id = 'AQ-RIG-01', seed = 42, start = Date.now(), faults = {}, counters = {}, calib = {} } = {}) {
+  constructor({ id = 'AQ-1001', seed = 42, start = Date.now(), faults = {}, counters = {}, calib = {} } = {}) {
     this.id = id;
     this.r = rng(seed);
     this.t = Math.floor(start / 1000) * 1000;
