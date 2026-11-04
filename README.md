@@ -32,6 +32,16 @@ This repository is the complete prototype from the build plan:
 Both paths carry the same CSV format and load the same model files, so the cloud
 and the handheld give the same answer.
 
+## Live demo website (no hardware, no server)
+
+`web/` is a static site that runs the whole system in the browser: a simulated
+rig with the fault-injection panel, the cloud console with alerts and job cards,
+the technician handheld, the customer app and the model card, plus guided tours of
+both scenarios. Deploy it on Vercel by importing the repository and setting the
+**Root Directory** to `web` (or keep the root: `vercel.json` points the output at
+`web/`). Run it locally with `cd web && python3 -m http.server 8000`. Details in
+[`web/README.md`](web/README.md).
+
 ## The two demo scenarios
 
 | | Scenario 1: company notices | Scenario 2: routine visit |
@@ -218,6 +228,7 @@ reports/        training report (confusion matrices, F1, RUL coverage)
 simulator/      virtual rig, simulated fleet seeder, sample SD card builder
 firmware/       ESP32 sketch + config.h
 mobile/         Expo companion app
+web/            static demo website (Vercel), JavaScript port of the engine
 data/           sample_sdcard (demo backup), rig_runs (your recordings)
 docs/           hardware, data collection protocol, logbook template, demo script
 legacy/         the earlier abstract-round prototype (FastAPI), kept for reference

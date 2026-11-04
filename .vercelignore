@@ -1,0 +1,14 @@
+# Only the static demo in web/ is deployed
+models/
+legacy/
+mobile/
+data/
+tests/
+reports/
+ml/
+cloud/
+console/
+handheld/
+simulator/
+firmware/
+aquasense/
