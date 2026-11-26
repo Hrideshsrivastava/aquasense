@@ -31,6 +31,7 @@
 
 #include <WiFi.h>
 #include <HTTPClient.h>
+#include <WiFiClientSecure.h>
 #include <ArduinoJson.h>
 #include <NimBLEDevice.h>
 
@@ -41,9 +42,9 @@
 const char* WIFI_SSID = "itsme";
 const char* WIFI_PASSWORD = "net12345";
 
-// Your laptop's IP address on the same Wi-Fi. "python -m server" prints the
-// exact line to paste here when it starts.
-const char* SERVER_URL = "http://192.168.1.100:5000/sensor-data";
+// Company server. Hosted on Render (HTTPS). For a laptop on the same Wi-Fi use
+// e.g. "http://192.168.1.100:5000/sensor-data" ("python -m server" prints it).
+const char* SERVER_URL = "https://aquasense-2wjz.onrender.com/sensor-data";
 const char* DEVICE_KEY = "";          // set if the server uses AQUASENSE_DEVICE_KEY
 const char* FIRMWARE_VERSION = "2.0.0";
 
@@ -346,8 +347,15 @@ void sendDataWiFi(uint32_t seq) {
   }
 
   HTTPClient http;
-  http.setTimeout(3000);
-  http.begin(SERVER_URL);
+  http.setTimeout(8000);            // a sleeping free Render service needs a while to wake
+  WiFiClientSecure secure;          // must live until http.end()
+  WiFiClient plain;
+  if (strncmp(SERVER_URL, "https", 5) == 0) {
+    secure.setInsecure();           // no certificate check: fine for a prototype
+    http.begin(secure, SERVER_URL);
+  } else {
+    http.begin(plain, SERVER_URL);
+  }
   http.addHeader("Content-Type", "application/json");
   if (strlen(DEVICE_KEY)) http.addHeader("X-Device-Key", DEVICE_KEY);
 
