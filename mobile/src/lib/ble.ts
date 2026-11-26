@@ -43,6 +43,8 @@ export function useAquaBLE() {
   const [info, setInfo] = useState<string | null>(null);
   const [readings, setReadings] = useState<Reading[]>([]);
   const [error, setError] = useState<string | null>(null);
+  // Debug counters so the technician can cross-check with the ESP32's Serial log
+  const [stats, setStats] = useState({ ok: 0, bad: 0, lastHex: '', lastAt: 0 });
   const sub = useRef<Subscription | null>(null);
   const dev = useRef<Device | null>(null);
   const scanTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
@@ -81,6 +83,7 @@ export function useAquaBLE() {
     stopScan();
     setError(null);
     setReadings([]);
+    setStats({ ok: 0, bad: 0, lastHex: '', lastAt: 0 });
     try {
       const d = await getManager().connectToDevice(f.id, { timeout: 10000 });
       await d.discoverAllServicesAndCharacteristics();
@@ -93,7 +96,11 @@ export function useAquaBLE() {
       d.onDisconnected(() => cleanup());
       sub.current = d.monitorCharacteristicForService(BLE_SERVICE_UUID, BLE_DATA_UUID, (err, ch) => {
         if (err) { setError(err.message); cleanup(); return; }
-        const r = ch?.value ? decodePacket(ch.value) : null;
+        if (!ch?.value) return;
+        const bytes = toByteArray(ch.value);
+        const hex = Array.from(bytes, (b) => b.toString(16).padStart(2, '0').toUpperCase()).join(' ');
+        const r = decodePacket(ch.value);
+        setStats((st) => ({ ok: st.ok + (r ? 1 : 0), bad: st.bad + (r ? 0 : 1), lastHex: hex, lastAt: Date.now() }));
         if (r) setReadings((prev) => [...prev.slice(-179), r]);
       });
     } catch (e) {
@@ -110,7 +117,7 @@ export function useAquaBLE() {
 
   useEffect(() => () => { stopScan(); sub.current?.remove(); }, [stopScan]);
 
-  return { supported: bleSupported, scanning, found, connected, info, readings, error, scan, stopScan, connect, disconnect, setReadings };
+  return { supported: bleSupported, scanning, found, connected, info, readings, error, stats, scan, stopScan, connect, disconnect, setReadings };
 }
 
 // For tests: build a packet like the ESP32 does (inverse of decodePacket).

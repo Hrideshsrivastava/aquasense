@@ -131,6 +131,10 @@ struct Overlay {
 
 bool serverReachable = false;
 
+// Raw sensor values before the server's fault overlay (for the Serial log)
+float rawFlow = 0, rawCurrent = 0, rawTurb = 0;
+unsigned long rawPulses = 0;
+
 // =====================================================
 // DEVICE IDENTITY + BLUETOOTH
 // =====================================================
@@ -188,6 +192,7 @@ void readFlowSensor(unsigned long elapsedMs) {
   flowPulseCount = 0;
   interrupts();
 
+  rawPulses = pulses;
   float volumeDuringInterval = pulses / FLOW_PULSES_PER_LITRE;
   flowRate_Lmin = volumeDuringInterval * (60000.0 / (elapsedMs ? elapsedMs : READ_INTERVAL));
 }
@@ -293,24 +298,42 @@ void applyOverlayAndFabricate(float dtSeconds) {
 // WIFI (non-blocking)
 // =====================================================
 
+const char* wifiStatusText(wl_status_t st) {
+  switch (st) {
+    case WL_CONNECTED: return "connected";
+    case WL_NO_SSID_AVAIL: return "hotspot NOT FOUND (name wrong, or hotspot on 5 GHz)";
+    case WL_CONNECT_FAILED: return "connection FAILED (wrong password, or WPA3-only)";
+    case WL_CONNECTION_LOST: return "connection lost";
+    case WL_DISCONNECTED: return "disconnected / still trying";
+    case WL_IDLE_STATUS: return "idle";
+    default: return "other";
+  }
+}
+
 void startWiFi() {
-  Serial.print("Connecting to WiFi: ");
-  Serial.println(WIFI_SSID);
+  Serial.printf("[WIFI] Connecting to \"%s\" (2.4 GHz only)\n", WIFI_SSID);
   WiFi.mode(WIFI_STA);
+  WiFi.persistent(false);
+  WiFi.setAutoReconnect(true);   // the ESP32 retries by itself; begin() is not called again while connecting
   WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
   lastWifiAttempt = millis();
 }
 
 void maintainWiFi() {
   static bool wasConnected = false;
-  bool up = WiFi.status() == WL_CONNECTED;
+  wl_status_t st = WiFi.status();
+  bool up = st == WL_CONNECTED;
   if (up && !wasConnected) {
-    Serial.print("WiFi connected! ESP32 IP Address: ");
-    Serial.println(WiFi.localIP());
+    Serial.printf("[WIFI] Connected. IP %s  RSSI %d dBm\n", WiFi.localIP().toString().c_str(), WiFi.RSSI());
   }
+  if (!up && wasConnected) Serial.println("[WIFI] Lost connection, retrying automatically");
   wasConnected = up;
-  if (!up && millis() - lastWifiAttempt > WIFI_RETRY_MS) {
-    WiFi.disconnect();
+  // Full restart only if it has really given up, at most every 30 s
+  if (!up && millis() - lastWifiAttempt > 30000) {
+    Serial.printf("[WIFI] Not connected: status %d = %s. Restarting Wi-Fi.\n", (int)st, wifiStatusText(st));
+    WiFi.disconnect(true);
+    delay(200);
+    WiFi.mode(WIFI_STA);
     WiFi.begin(WIFI_SSID, WIFI_PASSWORD);
     lastWifiAttempt = millis();
   }
@@ -334,7 +357,7 @@ void parseServerReply(const String& body) {
   overlay.turbidity = o["turbidity"] | 0;
   overlay.sensor = String((const char*)(o["sensor"] | "none"));
   overlay.tdsSource = o["tds_source"] | 300;
-  Serial.printf("Server set condition rev %d: clog=%d pump=%d membrane=%d turbidity=%d sensor=%s tds=%d\n",
+  Serial.printf("[SERVER] New condition rev %d: clog=%d pump=%d membrane=%d turbidity=%d sensor=%s tds=%d\n",
                 overlay.rev, overlay.clog, overlay.pump, overlay.membrane, overlay.turbidity,
                 overlay.sensor.c_str(), overlay.tdsSource);
 }
@@ -379,9 +402,11 @@ void sendDataWiFi(uint32_t seq) {
   String jsonData;
   serializeJson(doc, jsonData);
 
+  unsigned long t0 = millis();
   int responseCode = http.POST(jsonData);
   if (responseCode == 200) {
     serverReachable = true;
+    Serial.printf("[HTTP] #%lu sent to server: 200 OK in %lu ms\n", (unsigned long)seq, millis() - t0);
     parseServerReply(http.getString());
   } else {
     serverReachable = false;
@@ -395,11 +420,28 @@ void sendDataWiFi(uint32_t seq) {
 // BLUETOOTH LE (technician phone)
 // =====================================================
 
+class BleServerLog : public NimBLEServerCallbacks {
+  void onConnect(NimBLEServer* s, NimBLEConnInfo& info) override {
+    Serial.printf("[BLE] Phone CONNECTED: %s\n", info.getAddress().toString().c_str());
+  }
+  void onDisconnect(NimBLEServer* s, NimBLEConnInfo& info, int reason) override {
+    Serial.printf("[BLE] Phone DISCONNECTED (reason %d). Advertising again.\n", reason);
+  }
+};
+
+class BleDataLog : public NimBLECharacteristicCallbacks {
+  void onSubscribe(NimBLECharacteristic* c, NimBLEConnInfo& info, uint16_t subValue) override {
+    Serial.printf("[BLE] Phone %s live data (subscription %u)\n", subValue ? "SUBSCRIBED to" : "UNSUBSCRIBED from", subValue);
+  }
+};
+
 void setupBLE() {
   NimBLEDevice::init(bleName.c_str());
   bleServer = NimBLEDevice::createServer();
+  bleServer->setCallbacks(new BleServerLog());
   NimBLEService* svc = bleServer->createService(BLE_SERVICE_UUID);
   bleData = svc->createCharacteristic(BLE_DATA_UUID, NIMBLE_PROPERTY::READ | NIMBLE_PROPERTY::NOTIFY);
+  bleData->setCallbacks(new BleDataLog());
   bleInfo = svc->createCharacteristic(BLE_INFO_UUID, NIMBLE_PROPERTY::READ);
   String info = deviceId + ";fw=" + FIRMWARE_VERSION;
   bleInfo->setValue((uint8_t*)info.c_str(), info.length());
@@ -439,25 +481,46 @@ void notifyBLE() {
   for (int i = 0; i < 19; i++) x ^= p[i];
   p[19] = x;
   bleData->setValue(p, sizeof(p));
-  if (bleServer->getConnectedCount() > 0) bleData->notify();
+  int clients = bleServer->getConnectedCount();
+  if (clients > 0) bleData->notify();
+
+  // Print the packet and the values the phone will decode from it, to cross-check the app
+  char hex[61];
+  for (int i = 0; i < 20; i++) snprintf(hex + i * 3, 4, "%02X ", p[i]);
+  Serial.printf("[BLE] seq %3u %s -> %d phone(s)\n", p[1], clients ? "SENT" : "ready, no phone connected", clients);
+  Serial.printf("[BLE] bytes: %s\n", hex);
+  Serial.printf("[BLE] phone sees: flow %.3f L/min | pump %.3f A | turbidity %.3f V | TDS in %u | TDS out %.1f | pressure %.3f bar | temp %.2f C | flags run=%d wifi=%d server=%d\n",
+                (p[2] | p[3] << 8) / 1000.0, (int16_t)(p[4] | p[5] << 8) / 1000.0, (p[6] | p[7] << 8) / 1000.0,
+                (unsigned)(p[8] | p[9] << 8), (p[10] | p[11] << 8) / 10.0, (p[12] | p[13] << 8) / 1000.0,
+                (int16_t)(p[14] | p[15] << 8) / 100.0, p[18] & 1, (p[18] >> 1) & 1, (p[18] >> 2) & 1);
 }
 
 // =====================================================
 // SERIAL MONITOR DISPLAY FUNCTION
 // =====================================================
 
-void displaySensorData() {
+void displaySensorData(uint32_t seq) {
   Serial.println();
-  Serial.println("================================");
-  Serial.printf("Device: %s   WiFi: %s   BLE clients: %d\n", deviceId.c_str(),
-                WiFi.status() == WL_CONNECTED ? "up" : "down", bleServer ? bleServer->getConnectedCount() : 0);
-  Serial.printf("Flow Rate: %.3f L/min   Total Volume: %.3f L\n", flowRate_Lmin, totalVolume_L);
-  Serial.printf("Pump Current: %.3f A (ADC %d)\n", pumpCurrent_A, currentADC);
-  Serial.printf("Turbidity: %.3f V (ADC %d)\n", turbidityVoltage, turbidityADC);
-  Serial.printf("TDS in/out: %.0f / %.1f ppm   Pressure: %.2f bar   Temp: %.1f C\n", tdsIn_ppm, tdsOut_ppm, pressure_bar, waterTemp_C);
-  if (overlay.clog || overlay.pump || overlay.membrane || overlay.turbidity || overlay.sensor != "none")
-    Serial.printf("Active condition (rev %d) from server\n", overlay.rev);
-  Serial.println("================================");
+  Serial.printf("==================== reading #%lu  (uptime %lus) ====================\n", (unsigned long)seq, millis() / 1000);
+  Serial.printf("Device %s | WiFi %s | server %s | BLE phones %d\n", deviceId.c_str(),
+                WiFi.status() == WL_CONNECTED ? "up" : "DOWN", serverReachable ? "ok" : "not reached",
+                bleServer ? bleServer->getConnectedCount() : 0);
+  Serial.println("REAL SENSORS (measured)");
+  Serial.printf("  Flow      %.3f L/min  (%lu pulses in last read)   total %.3f L\n", rawFlow, rawPulses, totalVolume_L);
+  Serial.printf("  Current   %.3f A      (ADC %d, zero %.3f V)\n", rawCurrent, currentADC, currentZeroVoltage);
+  Serial.printf("  Turbidity %.3f V      (ADC %d)\n", rawTurb, turbidityADC);
+  Serial.println("VIRTUAL SENSORS (fabricated)");
+  Serial.printf("  TDS in %.0f ppm | TDS out %.1f ppm | rejection %.1f%% | pressure %.2f bar | temp %.1f C\n",
+                tdsIn_ppm, tdsOut_ppm, 100.0 * (1 - tdsOut_ppm / max(tdsIn_ppm, 1.0f)), pressure_bar, waterTemp_C);
+  bool active = overlay.clog || overlay.pump || overlay.membrane || overlay.turbidity || overlay.sensor != "none";
+  if (active) {
+    Serial.printf("SERVER CONDITION rev %d: clog %d, pump %d, membrane %d, turbidity %d, sensor %s, source %d ppm\n",
+                  overlay.rev, overlay.clog, overlay.pump, overlay.membrane, overlay.turbidity, overlay.sensor.c_str(), overlay.tdsSource);
+    Serial.printf("  after condition: flow %.3f L/min | current %.3f A | turbidity %.3f V\n", flowRate_Lmin, pumpCurrent_A, turbidityVoltage);
+  } else {
+    Serial.printf("SERVER CONDITION: none (source water %d ppm)\n", overlay.tdsSource);
+  }
+  Serial.printf("Water %s\n", waterRunning ? "FLOWING" : "not flowing (idle)");
 }
 
 // =====================================================
@@ -515,10 +578,12 @@ void loop() {
     readFlowSensor(elapsed);
     readCurrentSensor();
     readTurbiditySensor();
+    rawFlow = flowRate_Lmin; rawCurrent = pumpCurrent_A; rawTurb = turbidityVoltage;
     applyOverlayAndFabricate(elapsed / 1000.0);
 
-    displaySensorData();
+    seq++;
+    displaySensorData(seq);
     notifyBLE();          // phone on site gets it even with no Wi-Fi
-    sendDataWiFi(++seq);  // company server
+    sendDataWiFi(seq);    // company server
   }
 }

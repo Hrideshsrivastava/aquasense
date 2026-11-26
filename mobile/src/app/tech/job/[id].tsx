@@ -128,6 +128,7 @@ export default function JobScreen() {
               <Stat label="TDS out" value={last ? last.tds_out_ppm.toFixed(1) : '–'} />
               <Stat label="turbidity V" value={last ? last.turbidity_voltage_V.toFixed(2) : '–'} />
             </Row>
+            <LiveDebug last={last} stats={relay ? null : ble.stats} info={ble.info} />
             <View style={{ height: 8, backgroundColor: c.track, borderRadius: 4, marginTop: 12, overflow: 'hidden' }}>
               <View style={{ height: '100%', width: `${Math.min(100, (stream.length / MIN_READINGS) * 100)}%`, backgroundColor: c.accent }} />
             </View>
@@ -181,5 +182,48 @@ export default function JobScreen() {
         </>
       ) : null}
     </Screen>
+  );
+}
+
+// Every value exactly as decoded from the last Bluetooth packet, with its sequence
+// number and raw bytes: compare with the "[BLE] phone sees:" line on the ESP32 Serial Monitor.
+function LiveDebug({ last, stats, info }: { last?: Reading; stats: { ok: number; bad: number; lastHex: string; lastAt: number } | null; info: string | null }) {
+  const c = usePalette();
+  const [open, setOpen] = useState(true);
+  const [, tick] = useState(0);
+  useEffect(() => { const t = setInterval(() => tick((x) => x + 1), 1000); return () => clearInterval(t); }, []);
+  const age = stats?.lastAt ? Math.round((Date.now() - stats.lastAt) / 1000) : null;
+  const row = (k: string, v: string) => (
+    <View key={k} style={{ flexDirection: 'row', justifyContent: 'space-between', paddingVertical: 2 }}>
+      <Muted>{k}</Muted><Text style={{ color: c.text, fontFamily: Platform.select({ android: 'monospace', ios: 'Menlo', default: 'monospace' }), fontSize: 13 }}>{v}</Text>
+    </View>
+  );
+  return (
+    <View style={{ marginTop: 12, borderWidth: 1, borderColor: c.border, borderRadius: 10, padding: 10 }}>
+      <Pressable onPress={() => setOpen(!open)}>
+        <Body style={{ fontWeight: '600' }}>Live data check {open ? '▾' : '▸'}</Body>
+      </Pressable>
+      {open ? (
+        <>
+          {stats ? row('packets ok / rejected', `${stats.ok} / ${stats.bad}`) : row('source', 'server relay')}
+          {stats ? row('last packet', age === null ? 'none yet' : `${age} s ago`) : null}
+          {info ? row('device', info) : null}
+          {last ? (
+            <>
+              {row('seq', String(last.seq ?? '-'))}
+              {row('flow', `${last.flow_rate_Lmin.toFixed(3)} L/min`)}
+              {row('pump current', `${last.pump_current_A.toFixed(3)} A`)}
+              {row('turbidity', `${last.turbidity_voltage_V.toFixed(3)} V`)}
+              {row('TDS in', `${last.tds_in_ppm.toFixed(0)} ppm`)}
+              {row('TDS out', `${last.tds_out_ppm.toFixed(1)} ppm`)}
+              {row('pressure', `${last.pressure_bar.toFixed(3)} bar`)}
+              {row('temperature', `${last.water_temp_C.toFixed(2)} C`)}
+              {row('flags', `run=${last.running ? 1 : 0} wifi=${last.wifi ? 1 : 0} server=${last.server_ok ? 1 : 0}`)}
+            </>
+          ) : <Muted>Waiting for the first packet…</Muted>}
+          {stats?.lastHex ? <Muted style={{ marginTop: 4 }}>bytes: {stats.lastHex}</Muted> : null}
+        </>
+      ) : null}
+    </View>
   );
 }
