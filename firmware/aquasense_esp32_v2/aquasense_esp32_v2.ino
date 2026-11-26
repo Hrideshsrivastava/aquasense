@@ -130,6 +130,18 @@ struct Overlay {
 } overlay;
 
 bool serverReachable = false;
+void printConnectionStatus();   // defined further down
+
+// Connection diagnostics shown on the Serial Monitor
+int lastHttpCode = 0;                 // last HTTP result (negative = connection error)
+String lastHttpProblem = "not tried yet";
+unsigned long lastHttpOkMs = 0;       // millis() of the last 200 OK
+unsigned long lastHttpMs = 0;         // duration of the last request
+uint32_t httpOk = 0, httpFail = 0, httpFailStreak = 0;
+int lastWifiReason = 0;               // last Wi-Fi disconnect reason from the ESP32 driver
+String lastWifiProblem = "";
+bool bleSubscribed = false;
+String blePhone = "";
 
 // Raw sensor values before the server's fault overlay (for the Serial log)
 float rawFlow = 0, rawCurrent = 0, rawTurb = 0;
@@ -298,6 +310,38 @@ void applyOverlayAndFabricate(float dtSeconds) {
 // WIFI (non-blocking)
 // =====================================================
 
+String wifiReasonText(int r) {
+  switch (r) {
+    case 201: return "hotspot NOT FOUND: check the name, keep it on 2.4 GHz, phone nearby, hotspot screen open (iPhone)";
+    case 202: return "authentication FAILED: wrong password, or hotspot set to WPA3-only (use WPA2)";
+    case 15: case 204: return "WRONG PASSWORD (4-way handshake timeout)";
+    case 203: return "association failed: hotspot refused the ESP32 (device limit reached or MAC filter)";
+    case 200: return "signal lost (beacon timeout): move the ESP32 closer to the hotspot";
+    case 8: return "disconnected by the ESP32 (normal during a retry)";
+    case 2: case 6: case 7: return "hotspot dropped the connection: the phone may have turned the hotspot off";
+    case 3: case 4: return "hotspot dropped the ESP32 (inactivity or too many devices)";
+    default: return "Wi-Fi driver reason " + String(r);
+  }
+}
+
+void onWiFiEvent(WiFiEvent_t event, WiFiEventInfo_t info) {
+  switch (event) {
+    case ARDUINO_EVENT_WIFI_STA_CONNECTED:
+      Serial.printf("[WIFI] Joined \"%s\", waiting for an IP address...\n", WIFI_SSID);
+      break;
+    case ARDUINO_EVENT_WIFI_STA_GOT_IP:
+      lastWifiProblem = "";
+      break;
+    case ARDUINO_EVENT_WIFI_STA_DISCONNECTED:
+      lastWifiReason = info.wifi_sta_disconnected.reason;
+      lastWifiProblem = wifiReasonText(lastWifiReason);
+      Serial.printf("[WIFI] PROBLEM: %s (reason %d)\n", lastWifiProblem.c_str(), lastWifiReason);
+      break;
+    default:
+      break;
+  }
+}
+
 const char* wifiStatusText(wl_status_t st) {
   switch (st) {
     case WL_CONNECTED: return "connected";
@@ -312,6 +356,7 @@ const char* wifiStatusText(wl_status_t st) {
 
 void startWiFi() {
   Serial.printf("[WIFI] Connecting to \"%s\" (2.4 GHz only)\n", WIFI_SSID);
+  WiFi.onEvent(onWiFiEvent);
   WiFi.mode(WIFI_STA);
   WiFi.persistent(false);
   WiFi.setAutoReconnect(true);   // the ESP32 retries by itself; begin() is not called again while connecting
@@ -362,6 +407,20 @@ void parseServerReply(const String& body) {
                 overlay.sensor.c_str(), overlay.tdsSource);
 }
 
+String httpProblemText(int code, HTTPClient& http) {
+  if (code == 404) return "404: wrong URL. SERVER_URL must end with /sensor-data";
+  if (code == 401) return "401: device key rejected. DEVICE_KEY must match AQUASENSE_DEVICE_KEY on the server";
+  if (code == 400) return "400: server rejected the data (" + http.getString().substring(0, 80) + ")";
+  if (code == 502 || code == 503) return String(code) + ": server is starting up or asleep (Render free tier wakes in ~1 min)";
+  if (code >= 500) return String(code) + ": server error. Check the server logs";
+  if (code > 0) return "unexpected HTTP " + String(code);
+  if (code == HTTPC_ERROR_CONNECTION_REFUSED) return "connection refused: server not running, or wrong address/port in SERVER_URL";
+  if (code == HTTPC_ERROR_CONNECTION_LOST) return "connection lost while sending: weak Wi-Fi or server restarted";
+  if (code == HTTPC_ERROR_READ_TIMEOUT) return "timeout: server too slow (Render waking up?) or no internet on the hotspot";
+  if (code == HTTPC_ERROR_SEND_HEADER_FAILED || code == HTTPC_ERROR_SEND_PAYLOAD_FAILED) return "send failed: connection dropped (Wi-Fi or TLS)";
+  return http.errorToString(code) + " (" + String(code) + "): if HTTPS, check internet on the hotspot and that the URL starts with https://";
+}
+
 void sendDataWiFi(uint32_t seq) {
   if (WiFi.status() != WL_CONNECTED) {
     serverReachable = false;
@@ -404,14 +463,22 @@ void sendDataWiFi(uint32_t seq) {
 
   unsigned long t0 = millis();
   int responseCode = http.POST(jsonData);
+  lastHttpMs = millis() - t0;
+  lastHttpCode = responseCode;
   if (responseCode == 200) {
     serverReachable = true;
-    Serial.printf("[HTTP] #%lu sent to server: 200 OK in %lu ms\n", (unsigned long)seq, millis() - t0);
+    httpOk++;
+    httpFailStreak = 0;
+    lastHttpOkMs = millis();
+    lastHttpProblem = "";
+    Serial.printf("[HTTP] #%lu sent to server: 200 OK in %lu ms\n", (unsigned long)seq, lastHttpMs);
     parseServerReply(http.getString());
   } else {
     serverReachable = false;
-    Serial.print("HTTP transmission failed: ");
-    Serial.println(responseCode > 0 ? String(responseCode) : http.errorToString(responseCode));
+    httpFail++;
+    httpFailStreak++;
+    lastHttpProblem = httpProblemText(responseCode, http);
+    Serial.printf("[HTTP] #%lu FAILED after %lu ms: %s\n", (unsigned long)seq, lastHttpMs, lastHttpProblem.c_str());
   }
   http.end();
 }
@@ -422,15 +489,20 @@ void sendDataWiFi(uint32_t seq) {
 
 class BleServerLog : public NimBLEServerCallbacks {
   void onConnect(NimBLEServer* s, NimBLEConnInfo& info) override {
-    Serial.printf("[BLE] Phone CONNECTED: %s\n", info.getAddress().toString().c_str());
+    blePhone = String(info.getAddress().toString().c_str());
+    Serial.printf("[BLE] Phone CONNECTED: %s\n", blePhone.c_str());
   }
   void onDisconnect(NimBLEServer* s, NimBLEConnInfo& info, int reason) override {
-    Serial.printf("[BLE] Phone DISCONNECTED (reason %d). Advertising again.\n", reason);
+    bleSubscribed = false;
+    blePhone = "";
+    Serial.printf("[BLE] Phone DISCONNECTED (reason %d%s). Advertising again.\n", reason,
+                  reason == 0x208 ? ": phone out of range / timeout" : reason == 0x213 ? ": closed by the phone" : "");
   }
 };
 
 class BleDataLog : public NimBLECharacteristicCallbacks {
   void onSubscribe(NimBLECharacteristic* c, NimBLEConnInfo& info, uint16_t subValue) override {
+    bleSubscribed = subValue != 0;
     Serial.printf("[BLE] Phone %s live data (subscription %u)\n", subValue ? "SUBSCRIBED to" : "UNSUBSCRIBED from", subValue);
   }
 };
@@ -521,6 +593,40 @@ void displaySensorData(uint32_t seq) {
     Serial.printf("SERVER CONDITION: none (source water %d ppm)\n", overlay.tdsSource);
   }
   Serial.printf("Water %s\n", waterRunning ? "FLOWING" : "not flowing (idle)");
+  printConnectionStatus();
+}
+
+// ---- one block per reading: what is connected, and the exact problem if not
+void printConnectionStatus() {
+  Serial.println("CONNECTION STATUS");
+  wl_status_t st = WiFi.status();
+  if (st == WL_CONNECTED) {
+    int rssi = WiFi.RSSI();
+    Serial.printf("  Wi-Fi     OK   \"%s\" IP %s, signal %d dBm%s\n", WIFI_SSID, WiFi.localIP().toString().c_str(), rssi,
+                  rssi < -80 ? "  (WEAK: move closer)" : "");
+  } else {
+    Serial.printf("  Wi-Fi     DOWN status %d = %s\n", (int)st, wifiStatusText(st));
+    if (lastWifiProblem.length()) Serial.printf("            problem: %s\n", lastWifiProblem.c_str());
+  }
+  if (st != WL_CONNECTED) {
+    Serial.println("  Server    not tried (no Wi-Fi)");
+  } else if (serverReachable) {
+    Serial.printf("  Server    OK   %s  (%lu ms, %lu ok / %lu failed)\n", SERVER_URL, lastHttpMs, (unsigned long)httpOk, (unsigned long)httpFail);
+  } else {
+    Serial.printf("  Server    FAIL %s\n", SERVER_URL);
+    Serial.printf("            problem: %s\n", lastHttpProblem.c_str());
+    Serial.printf("            %lu failures in a row; last success %s\n", (unsigned long)httpFailStreak,
+                  lastHttpOkMs ? (String((millis() - lastHttpOkMs) / 1000) + " s ago").c_str() : "never");
+  }
+  int phones = bleServer ? bleServer->getConnectedCount() : 0;
+  if (phones == 0) {
+    Serial.printf("  Bluetooth advertising as %s, no phone connected\n", bleName.c_str());
+  } else if (!bleSubscribed) {
+    Serial.printf("  Bluetooth phone %s CONNECTED but NOT subscribed: the app is not receiving data (reopen the on-site check)\n", blePhone.c_str());
+  } else {
+    Serial.printf("  Bluetooth OK   phone %s receiving live data\n", blePhone.c_str());
+  }
+  Serial.printf("  Memory    %u bytes free\n", (unsigned)ESP.getFreeHeap());
 }
 
 // =====================================================
