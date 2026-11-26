@@ -15,6 +15,11 @@ mkdir -p logs data
 [ -f models/fault_classifier.joblib ] || python -m ml.train
 
 case "${1:-}" in
+  live)     # company server for real ESP32s + 4 simulated purifiers
+            python -m server.device_sim --count "${2:-4}" > logs/device_sim.log 2>&1 &
+            SIM=$!; trap 'kill $SIM 2>/dev/null' EXIT
+            python -m server ;;
+  server)   exec python -m server ;;
   rig)      exec python -m simulator.virtual_rig --panel ;;
   handheld) exec python -m handheld.app --windowed ;;
 esac

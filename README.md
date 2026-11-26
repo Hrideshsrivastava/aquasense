@@ -32,6 +32,21 @@ This repository is the complete prototype from the build plan:
 Both paths carry the same CSV format and load the same model files, so the cloud
 and the handheld give the same answer.
 
+## Live system: ESP32 + company server + Android app
+
+The current hardware (flow, pump current and turbidity on an ESP32) runs as a
+real-time service platform: `python -m server` on a laptop gives the company
+dashboard and the API; ESP32s (`firmware/aquasense_esp32_v2`) post every 2 s and
+stream over Bluetooth; one Android app (`mobile/`, APK built by GitHub Actions)
+serves technicians (jobs, Bluetooth on-site check, full diagnosis on the phone)
+and customers (purifier live, visit progress, book service). The server runs a
+light quick check and forms a hypothesis; the phone confirms it on site. Setup and
+the full flow: [`docs/live_system.md`](docs/live_system.md).
+
+```bash
+./run.sh live        # server + 4 simulated purifiers; dashboard on http://localhost:5000 (admin / 1234)
+```
+
 ## Live demo website (no hardware, no server)
 
 `web/` is a static site that runs the whole system in the browser: a simulated
@@ -226,8 +241,9 @@ ml/             synthetic data generator (follows the protocol) and training
 models/         trained joblib files + model_card.json (loaded by cloud and handheld)
 reports/        training report (confusion matrices, F1, RUL coverage)
 simulator/      virtual rig, simulated fleet seeder, sample SD card builder
-firmware/       ESP32 sketch + config.h
-mobile/         Expo companion app
+firmware/       ESP32 sketches: aquasense_esp32_v2 (live devices) and aquasense_rig (build-plan rig)
+mobile/         Android app (Expo): technician + customer roles, Bluetooth, on-phone diagnosis
+server/         live company server: /sensor-data, quick check, jobs, WebSocket, dashboard (static/)
 web/            static demo website (Vercel), JavaScript port of the engine
 data/           sample_sdcard (demo backup), rig_runs (your recordings)
 docs/           hardware, data collection protocol, logbook template, demo script

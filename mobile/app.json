@@ -19,12 +19,24 @@
         "monochromeImage": "./assets/images/android-icon-monochrome.png"
       },
       "predictiveBackGestureEnabled": false,
-      "package": "com.clusters.aquasense"
+      "package": "com.clusters.aquasense",
+      "permissions": [
+        "android.permission.BLUETOOTH_SCAN",
+        "android.permission.BLUETOOTH_CONNECT",
+        "android.permission.ACCESS_FINE_LOCATION",
+        "android.permission.BLUETOOTH",
+        "android.permission.BLUETOOTH_ADMIN",
+        "android.permission.VIBRATE"
+      ]
     },
     "ios": {
       "bundleIdentifier": "com.clusters.aquasense",
       "infoPlist": {
-        "NSAppTransportSecurity": { "NSAllowsLocalNetworking": true, "NSAllowsArbitraryLoads": true }
+        "NSAppTransportSecurity": {
+          "NSAllowsLocalNetworking": true,
+          "NSAllowsArbitraryLoads": true
+        },
+        "NSBluetoothAlwaysUsageDescription": "AquaSense connects to your purifier over Bluetooth to check it on site."
       }
     },
     "plugins": [
@@ -40,7 +52,19 @@
       [
         "expo-build-properties",
         {
-          "android": { "usesCleartextTraffic": true }
+          "android": {
+            "usesCleartextTraffic": true
+          }
+        }
+      ],
+      [
+        "react-native-ble-plx",
+        {
+          "isBackgroundEnabled": false,
+          "modes": [
+            "central"
+          ],
+          "bluetoothAlwaysPermission": "AquaSense connects to your purifier over Bluetooth to check it on site."
         }
       ]
     ],

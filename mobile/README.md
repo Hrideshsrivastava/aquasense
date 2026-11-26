@@ -1,29 +1,28 @@
-# AquaSense mobile app (Expo)
+# AquaSense Android app
 
-Companion app for the AquaSense prototype, built with the same stack as
-MuscleSense (Expo SDK 57, expo-router, React Native 0.86). It talks to the
-AquaSense cloud server (`python -m cloud.server`) over the phone hotspot.
+One app, two roles (sign in decides): **technician** and **customer**. Built with
+the same stack as MuscleSense (Expo SDK 57, expo-router, react-native-ble-plx).
 
-| Tab | What it shows |
-|---|---|
-| **My purifier** | Customer view ("connected-car tracker"): status, component health bars with the 40 % threshold, estimated life left, alert with the reason, estimated service cost, **Book service** (creates a ticket + job card on the server) |
-| **Technician** | Service jobs from the console's *Contact customer* button or from customers: fault, part to carry, estimate, job card, mark scheduled/done |
-| **Settings** | Cloud server address + connection test |
+* Customer: purifier live (WebSocket), component health, service-visit progress, book a visit.
+* Technician: jobs pushed in real time; on site, connect to the ESP32 over Bluetooth
+  (`AquaSense-XXXXXX`), run the **full diagnosis on the phone** (`src/lib/diagnosis.ts`),
+  send the result (queued if offline) and close the job.
 
-## Run
+## Get the APK
+
+GitHub Actions builds it on every push (workflow *Android APK*): download
+`AquaSense.apk` from the **android-latest** release or the run's artifacts.
+
+## Run from source
 
 ```bash
-cd mobile
 npm install
-EXPO_PUBLIC_AQUASENSE_SERVER=http://<laptop-ip>:5000 npx expo start
+npx expo run:android          # phone connected over USB, Android SDK installed
 ```
 
-Open it in Expo Go, a development build, or press `w` for the web version.
-The server address can also be changed in the Settings tab.
+Bluetooth uses a native module, so Expo Go cannot run it; use the APK or a
+development build. `npx expo start --web` runs the same screens in a browser,
+where the on-site check uses the server's live readings instead of Bluetooth.
 
-* The laptop and the phone must be on the same network (the demo hotspot).
-* Android allows plain `http://` to the laptop through `expo-build-properties`
-  (`usesCleartextTraffic`); iOS through `NSAllowsLocalNetworking`. Fine for a
-  hotspot demo; use HTTPS for anything real.
-
-Checks: `npm run typecheck` and `npm run export:web`.
+Checks: `npm run typecheck`, `npm run export:web`.
+Server setup and the end-to-end flow: `../docs/live_system.md`.

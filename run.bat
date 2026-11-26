@@ -6,6 +6,8 @@ call .venv\Scripts\activate
 pip install -q -r requirements.txt
 if not exist logs mkdir logs
 if not exist models\fault_classifier.joblib python -m ml.train
+if "%1"=="live" ( start "AquaSense devices" /min cmd /c "python -m server.device_sim --count 4 > logs\device_sim.log 2>&1" & python -m server & goto :eof )
+if "%1"=="server" ( python -m server & goto :eof )
 if "%1"=="rig" ( python -m simulator.virtual_rig --panel & goto :eof )
 if "%1"=="handheld" ( python -m handheld.app --windowed & goto :eof )
 python -m simulator.seed_fleet

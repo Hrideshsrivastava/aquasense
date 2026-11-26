@@ -14,3 +14,4 @@ data/synthetic_rig/
 data/rig_runs/*.csv
 !data/rig_runs/README.md
 logs/
+data/aquasense_server.db*
