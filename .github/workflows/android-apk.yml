@@ -47,8 +47,19 @@ jobs:
         working-directory: mobile/android
         run: |
           echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> gradle.properties
-          ./gradlew assembleRelease --no-daemon --stacktrace
+          set -o pipefail
+          ./gradlew assembleRelease --no-daemon --info 2>&1 | tee gradle.log | grep -v "^\s*at " | grep -E "^> Task|FAILURE|What went wrong|error|BUILD" || true
+          test -f app/build/outputs/apk/release/app-release.apk
           cp app/build/outputs/apk/release/app-release.apk ../AquaSense.apk
+
+      - name: Show why the build failed
+        if: failure()
+        working-directory: mobile/android
+        run: |
+          echo "---- node commands started by Gradle ----"
+          grep -n -A2 "Starting process 'command 'node''" gradle.log | tail -40 || true
+          echo "---- end of log ----"
+          grep -v "^\s*at " gradle.log | tail -80 || true
 
       - uses: actions/upload-artifact@v4
         with:
