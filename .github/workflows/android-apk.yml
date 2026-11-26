@@ -46,7 +46,8 @@ jobs:
       - name: Build release APK
         working-directory: mobile/android
         run: |
-          echo "org.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g" >> gradle.properties
+          # gradle.properties may not end with a newline: start ours on a fresh line
+          printf '\norg.gradle.jvmargs=-Xmx4g -XX:MaxMetaspaceSize=1g\n' >> gradle.properties
           set -o pipefail
           ./gradlew assembleRelease --no-daemon --info 2>&1 | tee gradle.log | grep -v "^\s*at " | grep -E "^> Task|FAILURE|What went wrong|error|BUILD" || true
           test -f app/build/outputs/apk/release/app-release.apk
