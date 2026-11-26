@@ -354,6 +354,28 @@ const char* wifiStatusText(wl_status_t st) {
   }
 }
 
+// List every network the ESP32 can hear, so a missing / 5 GHz hotspot is obvious
+void scanWiFi() {
+  Serial.println("[WIFI] Scanning for networks (the ESP32 only sees 2.4 GHz)...");
+  WiFi.mode(WIFI_STA);
+  WiFi.disconnect();
+  delay(100);
+  int n = WiFi.scanNetworks();
+  bool found = false;
+  if (n <= 0) Serial.println("[WIFI]   no networks found at all");
+  for (int i = 0; i < n; i++) {
+    bool match = WiFi.SSID(i) == WIFI_SSID;
+    found |= match;
+    Serial.printf("[WIFI]   %2d  \"%s\"  signal %d dBm  channel %d  %s%s\n", i + 1, WiFi.SSID(i).c_str(), WiFi.RSSI(i),
+                  WiFi.channel(i), WiFi.encryptionType(i) == WIFI_AUTH_OPEN ? "open" : "secured", match ? "   <-- your hotspot" : "");
+  }
+  if (!found) {
+    Serial.printf("[WIFI] \"%s\" is NOT in the list. The hotspot is on 5 GHz, or the name differs (case, spaces).\n", WIFI_SSID);
+    Serial.println("[WIFI] Android: Hotspot > AP band > 2.4 GHz.  iPhone: Personal Hotspot > Maximise Compatibility ON.");
+  }
+  WiFi.scanDelete();
+}
+
 void startWiFi() {
   Serial.printf("[WIFI] Connecting to \"%s\" (2.4 GHz only)\n", WIFI_SSID);
   WiFi.onEvent(onWiFiEvent);
@@ -643,9 +665,10 @@ void setup() {
   Serial.println("================================");
 
   // Identity from the MAC address: AQ-A1B2C3
+  // Read the factory MAC from eFuse: works before Wi-Fi starts (WiFi.macAddress() can return 00:00:00 then)
+  uint64_t efuse = ESP.getEfuseMac();
   uint8_t mac[6];
-  WiFi.mode(WIFI_STA);
-  WiFi.macAddress(mac);
+  for (int i = 0; i < 6; i++) mac[i] = (efuse >> (8 * i)) & 0xFF;
   char suffix[7];
   snprintf(suffix, sizeof(suffix), "%02X%02X%02X", mac[3], mac[4], mac[5]);
   deviceId = String("AQ-") + suffix;
@@ -661,6 +684,7 @@ void setup() {
   analogSetPinAttenuation(TURBIDITY_SENSOR_PIN, ADC_11db);
 
   calibrateCurrentSensor();   // pump must be OFF here
+  scanWiFi();
   setupBLE();
   startWiFi();                // does not block
 
